@@ -1,0 +1,26 @@
+libmosquitto_static: add the include dirs the shared target already has
+
+Without these, a WITH_STATIC_LIBRARIES=ON build fails with
+"property_common.h: No such file or directory" (libcommon/) and then
+"utlist.h: No such file or directory" (deps/).
+
+--- a/lib/CMakeLists.txt
++++ b/lib/CMakeLists.txt
+@@ -154,8 +154,17 @@
+ 		"${mosquitto_SOURCE_DIR}"
+ 		"${mosquitto_SOURCE_DIR}/include"
+ 		"${mosquitto_SOURCE_DIR}/lib"
++		"${mosquitto_SOURCE_DIR}/common"
++		"${mosquitto_SOURCE_DIR}/libcommon"
++		"${OPENSSL_INCLUDE_DIR}" # Required for cross compilation
+ 	)
+
++	if(WITH_BUNDLED_DEPS)
++		target_include_directories(libmosquitto_static PRIVATE
++			"${mosquitto_SOURCE_DIR}/deps"
++		)
++	endif()
++
+ 	set_target_properties(libmosquitto_static PROPERTIES
+ 		OUTPUT_NAME mosquitto_static
+ 		VERSION ${VERSION}
