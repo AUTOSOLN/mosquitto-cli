@@ -40,7 +40,17 @@ RUN cmake -S mosquitto-${MOSQUITTO_VERSION} -B build -G Ninja \
       cp build/client/$b /out/ && strip /out/$b; \
       if readelf -d /out/$b | grep -q NEEDED; then echo "$b is not static" >&2; exit 1; fi; \
     done \
- && cd /out && sha256sum * > SHA256SUMS
+ && cd /out && sha256sum mosquitto_pub mosquitto_sub mosquitto_rr > SHA256SUMS
+
+# License texts for everything statically linked into the binaries.
+# Alpine doesn't ship license files, so OpenSSL's and musl's are fetched for the installed versions.
+RUN set -e; mkdir -p /out/licenses/mosquitto /out/licenses/cjson /out/licenses/openssl /out/licenses/musl \
+ && for f in LICENSE.txt NOTICE.md epl-v20 edl-v10; do cp mosquitto-${MOSQUITTO_VERSION}/$f /out/licenses/mosquitto/; done \
+ && cp cJSON-${CJSON_VERSION}/LICENSE /out/licenses/cjson/ \
+ && openssl_version=$(apk info -e -v libcrypto3 | sed 's/^libcrypto3-//; s/-r[0-9]*$//') \
+ && musl_version=$(apk info -e -v musl | sed 's/^musl-//; s/-r[0-9]*$//') \
+ && curl -fsSL -o /out/licenses/openssl/LICENSE.txt https://raw.githubusercontent.com/openssl/openssl/openssl-${openssl_version}/LICENSE.txt \
+ && curl -fsSL -o /out/licenses/musl/COPYRIGHT "https://git.musl-libc.org/cgit/musl/plain/COPYRIGHT?h=v${musl_version}"
 
 FROM scratch
 COPY --from=build /out/ /

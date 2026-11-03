@@ -59,3 +59,9 @@ Patches live in `patches/<mosquitto-version>/` and are applied in filename order
 4. **Release.** Commit, then tag and push `v2.1.3` as above.
 
 The other versions in the Dockerfile (`ALPINE_VERSION`, `CJSON_VERSION`) can be bumped the same way. Use a `-N` tag suffix to release a rebuild of an existing Mosquitto version.
+
+## License
+
+The files in this repository (the Dockerfile, workflow and patches) are released under the MIT license; see [LICENSE](LICENSE).
+
+The built binaries are not covered by that license. They are Eclipse Mosquitto, dual-licensed under the [Eclipse Public License 2.0](https://www.eclipse.org/legal/epl-2.0/) and the [Eclipse Distribution License 1.0](https://www.eclipse.org/org/documents/edl-v10.php), and are statically linked with OpenSSL (Apache License 2.0), cJSON (MIT) and musl libc (MIT). Anyone redistributing the binaries must follow those licenses. Their license texts are included in each build under `licenses/`.
