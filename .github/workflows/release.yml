@@ -1,0 +1,100 @@
+name: release
+
+# Push a tag named v<mosquitto-version>[-<rebuild>] (e.g. v2.1.2 or v2.1.2-2) to build
+# static clients for every platform and publish them as a GitHub Release.
+# Run it manually from the Actions tab to test a build without releasing.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      mosquitto_version:
+        description: Mosquitto version to build (e.g. 2.1.2)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      mosquitto: ${{ steps.v.outputs.mosquitto }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - id: v
+        env:
+          INPUT: ${{ inputs.mosquitto_version }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-[0-9]+)?$ ]]; then
+              echo "::error::Tag '$GITHUB_REF_NAME' must look like v2.1.2 or v2.1.2-2"
+              exit 1
+            fi
+            echo "mosquitto=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "release=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "mosquitto=$INPUT" >> "$GITHUB_OUTPUT"
+            echo "release=$INPUT-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: linux-amd64
+          - platform: linux/arm64
+            arch: linux-arm64
+          - platform: linux/arm/v7
+            arch: linux-armv7
+    env:
+      NAME: mosquitto-clients-${{ needs.version.outputs.release }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        run: |
+          docker buildx build \
+            --platform ${{ matrix.platform }} \
+            --build-arg MOSQUITTO_VERSION=${{ needs.version.outputs.mosquitto }} \
+            --output type=local,dest="$NAME" .
+
+      - name: Package
+        run: |
+          (cd "$NAME" && sha256sum -c SHA256SUMS)
+          tar czf "$NAME.tar.gz" "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "mosquitto clients ${{ needs.version.outputs.release }}" \
+            --notes "Static mosquitto_pub, mosquitto_sub and mosquitto_rr built from Mosquitto ${{ needs.version.outputs.mosquitto }}." \
+            *.tar.gz SHA256SUMS
