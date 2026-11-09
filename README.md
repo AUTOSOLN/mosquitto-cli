@@ -1,14 +1,14 @@
-Static builds of the Mosquitto command-line clients (mosquitto_pub, mosquitto_sub and mosquitto_rr) for linux/amd64, linux/arm64 and linux/arm/v7.
+Static builds of the Mosquitto command-line clients (mosquitto_pub, mosquitto_sub and mosquitto_rr), plus a static tcpdump, for linux/amd64, linux/arm64 and linux/arm/v7.
 
 ## Building locally
 
-To build mosquitto_sub, mosquitto_pub and mosquitto_rr in dist/ per architecture:
+To build mosquitto_sub, mosquitto_pub, mosquitto_rr and tcpdump in dist/ per architecture:
 
 $ docker run --privileged --rm tonistiigi/binfmt --install arm,arm64
 
 $ docker buildx build   --platform linux/amd64,linux/arm64,linux/arm/v7 --output type=local,dest=dist .
 
-To build a different Mosquitto version without editing the Dockerfile, add `--build-arg MOSQUITTO_VERSION=2.1.3`.
+To build a different Mosquitto version without editing the Dockerfile, add `--build-arg MOSQUITTO_VERSION=2.1.3`. tcpdump and libpcap versions are set the same way with `TCPDUMP_VERSION` and `LIBPCAP_VERSION`.
 For quick iteration, build only `--platform linux/amd64`, which needs no emulation and is much faster.
 
 ## Releasing with GitHub Actions
@@ -58,10 +58,10 @@ Patches live in `patches/<mosquitto-version>/` and are applied in filename order
 
 4. **Release.** Commit, then tag and push `v2.1.3` as above.
 
-The other versions in the Dockerfile (`ALPINE_VERSION`, `CJSON_VERSION`) can be bumped the same way. Use a `-N` tag suffix to release a rebuild of an existing Mosquitto version.
+The other versions in the Dockerfile (`ALPINE_VERSION`, `CJSON_VERSION`, `TCPDUMP_VERSION`, `LIBPCAP_VERSION`) can be bumped the same way. Use a `-N` tag suffix to release a rebuild of an existing Mosquitto version.
 
 ## License
 
 The files in this repository (the Dockerfile, workflow and patches) are released under the MIT license; see [LICENSE](LICENSE).
 
-The built binaries are not covered by that license. They are Eclipse Mosquitto, dual-licensed under the [Eclipse Public License 2.0](https://www.eclipse.org/legal/epl-2.0/) and the [Eclipse Distribution License 1.0](https://www.eclipse.org/org/documents/edl-v10.php), and are statically linked with OpenSSL (Apache License 2.0), cJSON (MIT) and musl libc (MIT). Anyone redistributing the binaries must follow those licenses. Their license texts are included in each build under `licenses/`.
+The built binaries are not covered by that license. The mosquitto_* binaries are Eclipse Mosquitto, dual-licensed under the [Eclipse Public License 2.0](https://www.eclipse.org/legal/epl-2.0/) and the [Eclipse Distribution License 1.0](https://www.eclipse.org/org/documents/edl-v10.php), and are statically linked with OpenSSL (Apache License 2.0), cJSON (MIT) and musl libc (MIT). tcpdump is released under the 3-clause BSD license and is statically linked with libpcap (BSD) and musl libc (MIT); it is built without OpenSSL, so ESP decryption (`-E`) is not available. Anyone redistributing the binaries must follow those licenses. Their license texts are included in each build under `licenses/`.

@@ -1,7 +1,7 @@
 name: release
 
 # Push a tag named v<mosquitto-version>[-<rebuild>] (e.g. v2.1.2 or v2.1.2-2) to build
-# static clients for every platform and publish them as a GitHub Release.
+# static clients (and tcpdump) for every platform and publish them as a GitHub Release.
 # Run it manually from the Actions tab to test a build without releasing.
 on:
   push:
@@ -96,5 +96,5 @@ jobs:
           sha256sum *.tar.gz > SHA256SUMS
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "mosquitto clients ${{ needs.version.outputs.release }}" \
-            --notes "Static mosquitto_pub, mosquitto_sub and mosquitto_rr built from Mosquitto ${{ needs.version.outputs.mosquitto }}." \
+            --notes "Static mosquitto_pub, mosquitto_sub and mosquitto_rr built from Mosquitto ${{ needs.version.outputs.mosquitto }}, plus a static tcpdump." \
             *.tar.gz SHA256SUMS

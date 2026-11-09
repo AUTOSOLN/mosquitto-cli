@@ -1,5 +1,31 @@
 ARG ALPINE_VERSION=3.22
 
+# Static tcpdump, built against a static libpcap
+FROM alpine:${ALPINE_VERSION} AS tcpdump
+ARG TCPDUMP_VERSION=4.99.7
+ARG LIBPCAP_VERSION=1.10.7
+
+RUN apk add --no-cache build-base curl linux-headers flex bison pkgconf
+WORKDIR /src
+
+RUN curl -fsSL https://www.tcpdump.org/release/libpcap-${LIBPCAP_VERSION}.tar.gz | tar xz \
+ && curl -fsSL https://www.tcpdump.org/release/tcpdump-${TCPDUMP_VERSION}.tar.gz | tar xz
+
+RUN cd libpcap-${LIBPCAP_VERSION} \
+ && ./configure --prefix=/usr/local --disable-shared \
+      --disable-dbus --disable-rdma --disable-bluetooth --without-libnl \
+ && make -j"$(nproc)" && make install
+
+RUN cd tcpdump-${TCPDUMP_VERSION} \
+ && PKG_CONFIG_PATH=/usr/local/lib/pkgconfig LDFLAGS="-static" \
+      ./configure --without-crypto --without-smi --without-cap-ng \
+ && make -j"$(nproc)" \
+ && mkdir -p /out/licenses/tcpdump /out/licenses/libpcap \
+ && cp tcpdump /out/ && strip /out/tcpdump \
+ && if readelf -d /out/tcpdump | grep -q NEEDED; then echo "tcpdump is not static" >&2; exit 1; fi \
+ && cp LICENSE /out/licenses/tcpdump/ \
+ && cp ../libpcap-${LIBPCAP_VERSION}/LICENSE /out/licenses/libpcap/
+
 FROM alpine:${ALPINE_VERSION} AS build
 ARG MOSQUITTO_VERSION=2.1.2
 ARG CJSON_VERSION=1.7.19
@@ -35,14 +61,16 @@ RUN cmake -S mosquitto-${MOSQUITTO_VERSION} -B build -G Ninja \
       -DOPENSSL_USE_STATIC_LIBS=TRUE \
       -DCMAKE_EXE_LINKER_FLAGS="-static" \
  && cmake --build build \
- && mkdir /out \
+ && mkdir -p /out \
  && for b in mosquitto_pub mosquitto_sub mosquitto_rr; do \
       cp build/client/$b /out/ && strip /out/$b; \
       if readelf -d /out/$b | grep -q NEEDED; then echo "$b is not static" >&2; exit 1; fi; \
-    done \
- && cd /out && sha256sum mosquitto_pub mosquitto_sub mosquitto_rr > SHA256SUMS
+    done
 
-# License texts for everything statically linked into the binaries.
+COPY --from=tcpdump /out/ /out/
+RUN cd /out && sha256sum mosquitto_pub mosquitto_sub mosquitto_rr tcpdump > SHA256SUMS
+
+# License texts for everything statically linked into the binaries (tcpdump and libpcap come from the tcpdump stage).
 # Alpine doesn't ship license files, so OpenSSL's and musl's are fetched for the installed versions.
 RUN set -e; mkdir -p /out/licenses/mosquitto /out/licenses/cjson /out/licenses/openssl /out/licenses/musl \
  && for f in LICENSE.txt NOTICE.md epl-v20 edl-v10; do cp mosquitto-${MOSQUITTO_VERSION}/$f /out/licenses/mosquitto/; done \
